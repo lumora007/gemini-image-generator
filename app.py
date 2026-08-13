@@ -249,23 +249,43 @@ with tab2:
                     rewritten_text = response.text
                     
                     if rewritten_text:
-                        st.success("Text rewritten successfully!")
-                        st.subheader("Result:")
-                        st.text_area(
-                            "Rewritten text:",
-                            value=rewritten_text,
-                            height=200,
-                            key="rewritten_output"
-                        )
-                        
-                        st.download_button(
-                            label="Download as Text File",
-                            data=rewritten_text,
-                            file_name="rewritten_text.txt",
-                            mime="text/plain",
-                            key="download_text_btn"
-                        )
+                        st.session_state.rewrite_result = rewritten_text
                     else:
+                        st.session_state.rewrite_result = None
                         st.error("No output was generated. Please try again.")
                 except Exception as e:
+                    st.session_state.rewrite_result = None
                     st.error(f"An error occurred: {e}")
+
+    # Result is kept in session state so switching view tabs or changing a
+    # dropdown doesn't discard it.
+    result = st.session_state.get("rewrite_result")
+    if result:
+        st.subheader("Result")
+        formatted_tab, markdown_tab = st.tabs(["Formatted", "Markdown"])
+
+        with formatted_tab:
+            st.markdown(result)
+
+        with markdown_tab:
+            st.code(result, language="markdown")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                label="Download .txt",
+                data=result,
+                file_name="rewritten_text.txt",
+                mime="text/plain",
+                key="download_txt_btn",
+                use_container_width=True,
+            )
+        with col2:
+            st.download_button(
+                label="Download .md",
+                data=result,
+                file_name="rewritten_text.md",
+                mime="text/markdown",
+                key="download_md_btn",
+                use_container_width=True,
+            )
