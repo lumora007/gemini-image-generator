@@ -11,7 +11,10 @@ st.title("🖼️ Gemini Image Generator")
 st.write("Upload reference images (optional), enter a prompt, and generate a new image!")
 
 # Setup API Key
-API_KEY = st.secrets.get("GEMINI_API_KEY", "AIzaSyCF0nRew3uydZs4rRET0_-n5e6Xof3N7-A")
+API_KEY = st.secrets.get("GEMINI_API_KEY")
+if not API_KEY:
+    st.error("Please set GEMINI_API_KEY in Streamlit secrets.")
+    st.stop()
 client = genai.Client(api_key=API_KEY)
 
 # 1. Image Upload (0~n images)

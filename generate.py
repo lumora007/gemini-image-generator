@@ -3,7 +3,8 @@ from google.genai import types
 from PIL import Image
 from io import BytesIO
 
-client = genai.Client(api_key="AIzaSyCF0nRew3uydZs4rRET0_-n5e6Xof3N7-A")
+import os
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 # image = Image.open("input4.jpg")
 
 image = Image.open("BankStatement_Lan1.png")
