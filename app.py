@@ -43,6 +43,17 @@ if not API_KEY:
     st.stop()
 client = genai.Client(api_key=API_KEY)
 
+
+def part_to_pil(part):
+    """Return a PIL Image for an image part, or None. Streamlit needs a real
+    PIL Image, since the SDK's own Image type lacks the .format attribute."""
+    inline = getattr(part, "inline_data", None)
+    if inline is None or not inline.data:
+        return None
+    if inline.mime_type and not inline.mime_type.startswith("image/"):
+        return None
+    return Image.open(io.BytesIO(inline.data))
+
 # Create tabs for different features
 tab1, tab2 = st.tabs(["🖼️ Image Generator", "✍️ Text Rewriter"])
 
@@ -54,8 +65,10 @@ with tab1:
     # Available Gemini image models
     IMAGE_MODELS = [
         "gemini-3-pro-image-preview",
-        "gemini-2.0-flash-preview-image-generation",
-        "gemini-2.0-flash-exp-image-generation",
+        "gemini-3-pro-image",
+        "gemini-3.1-flash-image",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-lite-image",
     ]
 
     # Model Selection
@@ -107,35 +120,44 @@ with tab1:
                     contents = [image_prompt]
                     contents.extend(images)
                     
-                    response = client.models.generate_content(
-                        model=selected_image_model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            response_modalities=['Text', 'Image'],
-                            image_config=types.ImageConfig(
-                                image_size="1K"
-                            ),
-                            thinking_config=types.ThinkingConfig(
-                                include_thoughts=True
-                            )
-                        )
+                    full_config = types.GenerateContentConfig(
+                        response_modalities=['Text', 'Image'],
+                        image_config=types.ImageConfig(image_size="1K"),
+                        thinking_config=types.ThinkingConfig(include_thoughts=True),
                     )
+                    basic_config = types.GenerateContentConfig(
+                        response_modalities=['Text', 'Image'],
+                    )
+
+                    # Flash/Flash-Lite image models reject image_size and thinking,
+                    # so fall back to the minimal config if the full one is refused.
+                    try:
+                        response = client.models.generate_content(
+                            model=selected_image_model,
+                            contents=contents,
+                            config=full_config,
+                        )
+                    except Exception as first_error:
+                        try:
+                            response = client.models.generate_content(
+                                model=selected_image_model,
+                                contents=contents,
+                                config=basic_config,
+                            )
+                        except Exception:
+                            raise first_error
                     
                     output_image = None
                     output_text = []
                     
-                    for part in response.parts:
+                    for part in response.parts or []:
                         if part.text:
-                            output_text.append(part.text)
-                        elif part.thought:
-                            output_text.append(f"Thought: {part.text}")
+                            label = "Thought: " if getattr(part, "thought", False) else ""
+                            output_text.append(f"{label}{part.text}")
                         else:
-                            try:
-                                img_data = part.inline_data
-                                if img_data and img_data.mime_type.startswith("image/"):
-                                    output_image = Image.open(io.BytesIO(img_data.data))
-                            except AttributeError:
-                                pass
+                            pil = part_to_pil(part)
+                            if pil is not None:
+                                output_image = pil
                     
                     if output_text:
                         with st.expander("Show AI Thoughts / Text"):
@@ -147,6 +169,8 @@ with tab1:
                         st.image(output_image, caption="Generated Image", use_container_width=True)
                         
                         buf = io.BytesIO()
+                        if output_image.mode not in ("1", "L", "LA", "P", "RGB", "RGBA"):
+                            output_image = output_image.convert("RGB")
                         output_image.save(buf, format="PNG")
                         byte_im = buf.getvalue()
                         
@@ -169,10 +193,11 @@ with tab2:
 
     # Available text models
     TEXT_MODELS = [
-        "gemini-2.0-flash-lite",
-        "gemini-2.0-flash",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.1-pro-preview",
     ]
 
     # Model Selection
