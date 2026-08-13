@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.streamlit/secrets.toml
+*.jpg
+*.jpeg
+*.png
+*.xcf
+*.webp
+*.mhtml
